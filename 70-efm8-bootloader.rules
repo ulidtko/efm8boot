@@ -1,0 +1,8 @@
+SUBSYSTEM=="usb", ACTION=="add", ATTR{idVendor}=="10c4", ATTR{idProduct}=="eac9", \
+    MODE="660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ACTION=="add", ATTR{idVendor}=="10c4", ATTR{idProduct}=="eaca", \
+    MODE="660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ACTION=="add", ATTR{idVendor}=="10c4", ATTR{idProduct}=="eacb", \
+    MODE="660", GROUP="plugdev", TAG+="uaccess"
+
+# vim: filetype=udevrules
