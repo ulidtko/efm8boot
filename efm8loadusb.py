@@ -238,13 +238,17 @@ def do_runapp(dev):
     hid_get_report(dev)
 
 def trace(direction, content):
-    """  """
-    if direction == 'in':
-        print(map(chr, content))
-    if direction == 'out':
-        hex = str.join(' ', ["%02X" % c for c in content])
-        hex = hex.replace('24', '$', 1)
-        print(hex + " -> ", end='')
+    """ Trace device-host communications """
+    if opts.trace:
+        if direction == 'in':
+            print([chr(c) if chr(c).isprintable() else "%02X" % c for c in content])
+        if direction == 'out':
+            hex = str.join(' ', ["%02X" % c for c in content])
+            hex = hex.replace('24', '$', 1)
+            print(hex + " -> ", end='')
+    else:
+        if direction == 'in':
+            print(chr(content[0]), end='')
 
 def main(): #pylint: disable=missing-docstring
     argP = argparse.ArgumentParser(
@@ -267,7 +271,7 @@ def main(): #pylint: disable=missing-docstring
     cmdFlash.add_argument('img', metavar="IHEX",
                           type=argparse.FileType('r'), default=sys.stdin,
                           help="an Intel HEX firmware file [STDIN]")
-
+    global opts
     opts = argP.parse_args()
     device = locate_device(argP, opts)
     return opts.cmd(device, opts)
