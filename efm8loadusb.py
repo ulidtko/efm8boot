@@ -36,6 +36,7 @@ def product_filter(dev):
 
 def hid_set_report(dev, report):
     """ Implements HID SetReport via USB control transfer """
+    trace('out', report)
     dev.ctrl_transfer(
         0x21, # REQUEST_TYPE_CLASS | RECIPIENT_INTERFACE | ENDPOINT_OUT
         9, # SET_REPORT
@@ -44,11 +45,13 @@ def hid_set_report(dev, report):
 
 def hid_get_report(dev):
     """ Implements HID GetReport via USB control transfer """
-    return dev.ctrl_transfer(
+    r = dev.ctrl_transfer(
         0xA1, # REQUEST_TYPE_CLASS | RECIPIENT_INTERFACE | ENDPOINT_IN
         1, # GET_REPORT
         0x200, 0x00,
-        4)
+        1)
+    trace('in', r)
+    return r
 
 def locate_device(argp, _):
     """ Find and init our USB device """
@@ -111,11 +114,25 @@ def do_identify(dev, a, b):
 def cmd_flash(dev, opts):
     """ flash cmdline handler """
     ihex = IntelHex().fromfile(opts.img, format='hex')
-
     do_setup(dev)
-
     for a, b in ihex.segments():
-        pass
+        segment = ihex[a:b]
+        write_chunked(dev, segment, a, chunksize=128)
+        crc_check(dev, segment, a)
+
+def write_chunked(dev, datum, addr, chunksize):
+    PAGE = 512
+    assert addr % PAGE == 0, "TODO unaligned start addr"
+    while len(datum) > 0:
+        size = min(chunksize, len(datum))
+        chunk, datum = datum[:size], datum[size:]
+
+        if addr % PAGE == 0:
+            do_erase(dev, addr)
+        do_write(dev, addr, chunk)
+        crc_check(dev, chunk, addr)
+
+        addr += size
 
 def do_setup(dev):
     """
@@ -131,7 +148,7 @@ def do_setup(dev):
     hid_set_report(dev, [36, 4, 0x31, 0xA5, 0xF1, 0x00])
     assert hid_get_report(dev) [0] == 0x40 #pylint: disable=bad-whitespace
 
-def do_erase(dev, addr, length):
+def do_erase(dev, addr):
     """
     > Erase 0x32 — [addr:2, data:0-128]
     > The erase command behaves the same as the write command except that it
@@ -144,7 +161,7 @@ def do_erase(dev, addr, length):
     bootloader.
     """
     addrH, addrL = addr // 256, addr % 256
-    hid_set_report(dev, [36, 4, 0x32, addrH, addrL, length])
+    hid_set_report(dev, [36, 3, 0x32, addrH, addrL])
     assert hid_get_report(dev) [0] == 0x40 #pylint: disable=bad-whitespace
 
 def do_write(dev, addr, data):
@@ -158,6 +175,14 @@ def do_write(dev, addr, data):
     dlen = len(data)
     hid_set_report(dev, [36, dlen + 3, 0x33, addrH, addrL] + data)
     assert hid_get_report(dev) [0] == 0x40 #pylint: disable=bad-whitespace
+
+def crc_check(dev, data, addr):
+    expected = crc16_ccitt(0, data)
+    r = do_verify(dev, addr, addr + len(data) - 1, expected)
+    if r == 0x43:
+        raise RuntimeError(
+            "CRC mismatch @ {:04X}, expected {:04X}, actual <unknown>".format(addr, expected)
+        )
 
 def crc16_ccitt(crc, data):
     """ "XMODEM", poly=0x1021, init=0x0000 """
@@ -174,7 +199,7 @@ def do_verify(dev, addr1, addr2, crc16):
     """
     > Verify 0x34 — [addr1:2, addr2:2, CRC16:2]
     > This command computes a CRC16 (CCITT-16, XModem) over the flash contents
-    starting at addr1 up to and including addr2 and com- pares the result to
+    starting at addr1 up to and including addr2 and compares the result to
     CRC16. Returns a CRC error (0x43) if the CRC's do not match.
     """
     addr1H, addr1L = addr1 // 256, addr1 % 256
@@ -182,7 +207,7 @@ def do_verify(dev, addr1, addr2, crc16):
     crcH, crcL = crc16 // 256, crc16 % 256
     hid_set_report(dev, [36, 7, 0x34, addr1H, addr1L, addr2H, addr2L, crcH, crcL])
     r = hid_get_report(dev)
-    return r[0] == 0x40
+    return r[0]
 
 def do_lock(dev, sig=0xFF, lock=0xFF):
     """
@@ -212,12 +237,21 @@ def do_runapp(dev):
     hid_set_report(dev, [36, 3, 0x36, 0x00, 0x00])
     hid_get_report(dev)
 
+def trace(direction, content):
+    """  """
+    if direction == 'in':
+        print(map(chr, content))
+    if direction == 'out':
+        hex = str.join(' ', ["%02X" % c for c in content])
+        hex = hex.replace('24', '$', 1)
+        print(hex + " -> ", end='')
 
 def main(): #pylint: disable=missing-docstring
     argP = argparse.ArgumentParser(
         description="EFM8 factory bootloader client",
         epilog="Remember to put the device in bootloader mode! (C2D to GND and power-on)"
     )
+    argP.add_argument('--trace', action='store_true', help="Dump all communication bytes")
     actP = argP.add_subparsers(title="actions")
 
     cmdID = actP.add_parser('identify', help="Identify (0x30) command")
