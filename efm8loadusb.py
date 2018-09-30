@@ -113,10 +113,10 @@ def do_identify(dev, a, b):
 
 def cmd_flash(dev, opts):
     """ flash cmdline handler """
-    ihex = IntelHex().fromfile(opts.img, format='hex')
+    ihex = IntelHex(source=opts.img)
     do_setup(dev)
     for a, b in ihex.segments():
-        segment = ihex[a:b]
+        segment = ihex.tobinstr(start=a, end=b)
         write_chunked(dev, segment, a, chunksize=128)
         crc_check(dev, segment, a)
 
@@ -172,7 +172,7 @@ def do_write(dev, addr, data):
     targeted address range cannot be written by the bootloader.
     """
     addrH, addrL = addr // 256, addr % 256
-    dlen = len(data)
+    dlen, data = len(data), list(data)
     hid_set_report(dev, [36, dlen + 3, 0x33, addrH, addrL] + data)
     assert hid_get_report(dev) [0] == 0x40 #pylint: disable=bad-whitespace
 
@@ -189,7 +189,7 @@ def crc16_ccitt(crc, data):
     msb = crc >> 8
     lsb = crc & 255
     for c in data:
-        x = ord(c) ^ msb
+        x = c ^ msb
         x ^= (x >> 4)
         msb = (lsb ^ (x >> 3) ^ (x << 4)) & 255
         lsb = (x ^ (x << 5)) & 255
