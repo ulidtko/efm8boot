@@ -130,7 +130,7 @@ def write_chunked(dev, datum, addr, chunksize):
         if addr % PAGE == 0:
             do_erase(dev, addr)
         do_write(dev, addr, chunk)
-        crc_check(dev, chunk, addr)
+        #crc_check(dev, chunk, addr)
 
         addr += size
 
