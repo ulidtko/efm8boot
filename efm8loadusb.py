@@ -116,7 +116,7 @@ def cmd_flash(dev, opts):
     ihex = IntelHex(source=opts.img)
     do_setup(dev)
     for a, b in ihex.segments():
-        segment = ihex.tobinstr(start=a, end=b)
+        segment = ihex.tobinstr(start=a, end=b-1)
         write_chunked(dev, segment, a, chunksize=128)
         crc_check(dev, segment, a)
 
