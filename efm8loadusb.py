@@ -82,19 +82,30 @@ def cmd_identify(dev, opts):
         for a in range(256):
             for b in range(256):
                 if do_identify(dev, a, b):
-                    print("The device identifies as:")
-                    print("{:2X}:{:2X} {!r}".format(a, b, chr(a) + chr(b)))
+                    print("The device identifies as " + identify_interpret(a,b))
                     return 0
         print("Identification failed!")
         return 12
 
     a, b = [int(s, base=16) for s in opts.id.split(':')]
     if do_identify(dev, a, b):
-        print("Identified as {:2X}:{:2X}.".format(a, b))
+        print("Identified as " + identify_interpret(a, b))
     else:
-        print("Identify as {:2X}:{:2X} did not return ACK".format(a, b))
+        print("Identify as {:2X}:{:2X} was NACK".format(a, b))
         return 13
     return 0
+
+def identify_interpret(a, b):
+    datasheet_hits = {
+        (0x32, 0x41): "EFM8UB10F16G_QFN28",
+        (0x32, 0x43): "EFM8UB10F16G_QFN20",
+        (0x32, 0x45): "EFM8UB11F16G_QSOP24",
+        (0x32, 0x49): "EFM8UB10F8G_QFN20",
+    }
+    if (a,b) in datasheet_hits.keys():
+        return "{} [{:2X}:{:2X}].".format(datasheet_hits[a,b], a, b)
+    else:
+        return "{:2X}:{2X} ?.. which is unknown DEVICEID:DERIVID, proceed with care"
 
 def do_identify(dev, a, b):
     """
@@ -261,7 +272,7 @@ def main(): #pylint: disable=missing-docstring
     cmdID = actP.add_parser('identify', help="Identify (0x30) command")
     cmdID.set_defaults(cmd=cmd_identify)
     cmdID.add_argument('id', nargs='?', default=None,
-                       help="Bootloader ID, two bytes in format AA:BB")
+                       help="DEVICEID:DERIVID, two bytes in format AA:BB")
 
     cmdApp = actP.add_parser('runapp', help="Reboot into main user firmware")
     cmdApp.set_defaults(cmd=cmd_runapp)
