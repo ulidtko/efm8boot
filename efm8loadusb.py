@@ -70,6 +70,7 @@ def locate_device(argp, _):
     device.set_configuration()
     return device
 
+#-----------------------------------------------------------------------------#
 
 def cmd_identify(dev, opts):
     """ The identify commandline handler. Will try the user-passed ID, or
@@ -107,6 +108,15 @@ def do_identify(dev, a, b):
     r = hid_get_report(dev)
     return r[0] == 0x40
 
+def cmd_flash(dev, opts):
+    """ flash cmdline handler """
+    ihex = IntelHex().fromfile(opts.img, format='hex')
+
+    do_setup(dev)
+
+    for a, b in ihex.segments():
+        pass
+
 def do_setup(dev):
     """
     > Setup 0x31 — [keys:2, bank:1]
@@ -125,7 +135,7 @@ def do_erase(dev, addr, length):
     """
     > Erase 0x32 — [addr:2, data:0-128]
     > The erase command behaves the same as the write command except that it
-    erases the flash page at the desired address before writ- ing any data. To
+    erases the flash page at the desired address before writing any data. To
     perform a page erase without writing data, simply do not include data with
     the command. The data range of an erase command must not cross a flash page
     boundary, as the bootloader is not aware of page boundaries and only erases
@@ -148,6 +158,17 @@ def do_write(dev, addr, data):
     dlen = len(data)
     hid_set_report(dev, [36, dlen + 3, 0x33, addrH, addrL] + data)
     assert hid_get_report(dev) [0] == 0x40 #pylint: disable=bad-whitespace
+
+def crc16_ccitt(crc, data):
+    """ "XMODEM", poly=0x1021, init=0x0000 """
+    msb = crc >> 8
+    lsb = crc & 255
+    for c in data:
+        x = ord(c) ^ msb
+        x ^= (x >> 4)
+        msb = (lsb ^ (x >> 3) ^ (x << 4)) & 255
+        lsb = (x ^ (x << 5)) & 255
+    return (msb << 8) + lsb
 
 def do_verify(dev, addr1, addr2, crc16):
     """
@@ -176,6 +197,10 @@ def do_lock(dev, sig=0xFF, lock=0xFF):
     hid_set_report(dev, [36, 3, 0x35, sig, lock])
     hid_get_report(dev)
 
+def cmd_runapp(dev, _):
+    """ runapp cmdline handler """
+    do_runapp(dev)
+
 def do_runapp(dev):
     """
     > RunApp 0x36 — [option:2]
@@ -187,17 +212,6 @@ def do_runapp(dev):
     hid_set_report(dev, [36, 3, 0x36, 0x00, 0x00])
     hid_get_report(dev)
 
-def crc16_ccitt(crc, data):
-    """ "XMODEM", poly=0x1021, init=0x0000 """
-    msb = crc >> 8
-    lsb = crc & 255
-    for c in data:
-        x = ord(c) ^ msb
-        x ^= (x >> 4)
-        msb = (lsb ^ (x >> 3) ^ (x << 4)) & 255
-        lsb = (x ^ (x << 5)) & 255
-    return (msb << 8) + lsb
-
 
 def main(): #pylint: disable=missing-docstring
     argP = argparse.ArgumentParser(
@@ -205,10 +219,20 @@ def main(): #pylint: disable=missing-docstring
         epilog="Remember to put the device in bootloader mode! (C2D to GND and power-on)"
     )
     actP = argP.add_subparsers(title="actions")
+
     cmdID = actP.add_parser('identify', help="Identify (0x30) command")
     cmdID.set_defaults(cmd=cmd_identify)
     cmdID.add_argument('id', nargs='?', default=None,
                        help="Bootloader ID, two bytes in format AA:BB")
+
+    cmdApp = actP.add_parser('runapp', help="Reboot into main user firmware")
+    cmdApp.set_defaults(cmd=cmd_runapp)
+
+    cmdFlash = actP.add_parser('upload', help="Flash given ihex image")
+    cmdFlash.set_defaults(cmd=cmd_flash)
+    cmdFlash.add_argument('img', metavar="IHEX",
+                          type=argparse.FileType('r'), default=sys.stdin,
+                          help="an Intel HEX firmware file [STDIN]")
 
     opts = argP.parse_args()
     device = locate_device(argP, opts)
