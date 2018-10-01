@@ -13,6 +13,7 @@ from __future__ import print_function
 import sys
 import argparse
 import warnings
+from itertools import chain
 
 try:
     import usb.core
@@ -102,6 +103,7 @@ def identify_interpret(a, b):
         (0x32, 0x43): "EFM8UB10F16G_QFN20",
         (0x32, 0x45): "EFM8UB11F16G_QSOP24",
         (0x32, 0x49): "EFM8UB10F8G_QFN20",
+        (0x32, 0x4A): "EFM8UB11F16G_QFN24",
     }
     if (a,b) in datasheet_hits.keys():
         return "{} [{:2X}:{:2X}].".format(datasheet_hits[a,b], a, b)
@@ -285,8 +287,9 @@ def cmd_dump(dev, opts):
     freq_crc = [(byte, crc16_ccitt(0, [byte])) for byte in freq_order]
 
     #-- first, try to quickly localize non-empty areas
+    #-- FIXME detect 8kiB devices and adjust 0x4000 -> 0x2000
     pending_blocks = [(a, a + 512) for a in range(0, 0x4000, 512)]
-    known_bytes = {i: None for i in range(0, 0x4000)}
+    known_bytes = {i: None for i in chain(range(0, 0x4000), range(0xfbc0, 0xfc00))}
     while pending_blocks:
         blockA, blockB = pending_blocks.pop()
         blocksize = blockB - blockA
