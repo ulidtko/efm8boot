@@ -12,6 +12,7 @@ from __future__ import print_function
 
 import sys
 import argparse
+import warnings
 
 try:
     import usb.core
@@ -133,7 +134,13 @@ def cmd_flash(dev, opts):
 
 def write_chunked(dev, datum, addr, chunksize):
     PAGE = 512
-    assert addr % PAGE == 0, "TODO unaligned start addr"
+    if addr % PAGE != 0:
+        pagestart = addr // PAGE * PAGE
+        warnings.warn(
+            "Unaligned segment start @ {:04X}; flash page [{:04X}-{:04X}) erase skipped!"
+            .format(addr, pagestart, pagestart + PAGE)
+        )
+        #do_erase(dev, pagestart)
     while len(datum) > 0:
         size = min(chunksize, len(datum))
         chunk, datum = datum[:size], datum[size:]
