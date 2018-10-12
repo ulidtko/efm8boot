@@ -23,6 +23,7 @@ except ImportError:
     sys.exit(1)
 
 # pylint: disable=invalid-name
+# pylint: disable=bad-whitespace
 
 #-----------------------------------------------------------------------------#
 
@@ -98,6 +99,7 @@ def cmd_identify(dev, opts):
     return 0
 
 def identify_interpret(a, b):
+    """ Maps known DEVICEID:DERIVID pairs """
     datasheet_hits = {
         (0x32, 0x41): "EFM8UB10F16G_QFN28",
         (0x32, 0x43): "EFM8UB10F16G_QFN20",
@@ -108,7 +110,7 @@ def identify_interpret(a, b):
     if (a,b) in datasheet_hits.keys():
         return "{} [{:2X}:{:2X}].".format(datasheet_hits[a,b], a, b)
     else:
-        return "{:2X}:{2X} ?.. which is unknown DEVICEID:DERIVID, proceed with care"
+        return "{:2X}:{:2X} ?.. which is unknown DEVICEID:DERIVID, proceed with care"
 
 def do_identify(dev, a, b):
     """
@@ -128,6 +130,7 @@ def do_identify(dev, a, b):
 def cmd_flash(dev, opts):
     """ flash cmdline handler """
     ihex = IntelHex(source=opts.img)
+    #cmd_identify(dev, opts)
     do_setup(dev)
     for a, b in ihex.segments():
         segment = ihex.tobinstr(start=a, end=b-1)
@@ -135,6 +138,7 @@ def cmd_flash(dev, opts):
         crc_check(dev, segment, a)
 
 def write_chunked(dev, datum, addr, chunksize):
+    """ The flashing workhorse """
     PAGE = 512
     if addr % PAGE != 0:
         pagestart = addr // PAGE * PAGE
@@ -151,7 +155,6 @@ def write_chunked(dev, datum, addr, chunksize):
             do_erase(dev, addr)
         do_write(dev, addr, chunk)
         #crc_check(dev, chunk, addr)
-
         addr += size
 
 def do_setup(dev):
@@ -197,12 +200,13 @@ def do_write(dev, addr, data):
     assert hid_get_report(dev) [0] == 0x40 #pylint: disable=bad-whitespace
 
 def crc_check(dev, data, addr):
+    """ Crashes with RuntimeError if device reports CRC16 mismatch for data at addr """
     expected = crc16_ccitt(0, data)
     r = do_verify(dev, addr, addr + len(data) - 1, expected)
     if r == 0x43:
         raise RuntimeError(
             "CRC mismatch @ {:04X}, expected {:04X}, actual <unknown>".format(addr, expected)
-        )
+        ) #-- TODO find/guess the actual if needed
 
 def crc16_ccitt(crc, data):
     """ "XMODEM", poly=0x1021, init=0x0000 """
@@ -348,6 +352,7 @@ def cmd_dump(dev, opts):
 
 def trace(direction, content):
     """ Trace device-host communications """
+    global opts
     if opts.trace:
         if direction == 'in':
             print([chr(c) if chr(c).isprintable() else "%02X" % c for c in content])
@@ -355,15 +360,11 @@ def trace(direction, content):
             hex = str.join(' ', ["%02X" % c for c in content])
             hex = hex.replace('24', '$', 1)
             print(hex + " -> ", end='')
-    else:
-        #if direction == 'in':
-        #    print(chr(content[0]), end='')
-        pass
 
 def main(): #pylint: disable=missing-docstring
     argP = argparse.ArgumentParser(
         description="EFM8 factory bootloader client",
-        epilog="Remember to put the device in bootloader mode! (C2D to GND and power-on)"
+        epilog="Remember to put the device in bootloader mode! (power-on with C2D to GND)"
     )
     argP.add_argument('--trace', action='store_true', help="Dump all communication bytes")
     actP = argP.add_subparsers(title="actions")
