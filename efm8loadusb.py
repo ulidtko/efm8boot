@@ -233,6 +233,14 @@ def do_verify(dev, addr1, addr2, crc16):
     r = hid_get_report(dev)
     return r[0]
 
+def cmd_lock(dev, opts):
+    """ lock commandline handler"""
+    locking_flash = opts.noundo in ('flash', 'both')
+    locking_bootl = opts.noundo in ('bootloader', 'both')
+    do_lock(dev,
+            sig=0xBB if locking_bootl else 0xFF,
+            lock=0xDD if locking_flash else 0xFF)
+
 def do_lock(dev, sig=0xFF, lock=0xFF):
     """
     > Lock 0x35 — [sig:1, lock:1]
@@ -376,6 +384,12 @@ def main(): #pylint: disable=missing-docstring
 
     cmdApp = actP.add_parser('runapp', help="Reboot into main user firmware")
     cmdApp.set_defaults(cmd=cmd_runapp)
+
+    cmdLock = actP.add_parser('lock',
+                              help="IRREVERSIBLY disable flash and/or bootloader")
+    cmdLock.set_defaults(cmd=cmd_lock)
+    cmdLock.add_argument('noundo', choices=('flash', 'bootloader', 'both'),
+                         help="There's no undo for this operation.")
 
     cmdFlash = actP.add_parser('upload', help="Flash given ihex image")
     cmdFlash.set_defaults(cmd=cmd_flash)
