@@ -106,6 +106,15 @@ def identify_interpret(a, b):
         (0x32, 0x45): "EFM8UB11F16G_QSOP24",
         (0x32, 0x49): "EFM8UB10F8G_QFN20",
         (0x32, 0x4A): "EFM8UB11F16G_QFN24",
+        (0x28, 0x65): "EFM8UB20F32G_QFN32",
+        (0x28, 0x64): "EFM8UB20F32G_QFP32",
+        (0x28, 0x63): "EFM8UB20F32G_QFP48",
+        (0x28, 0x62): "EFM8UB20F64G_QFN32",
+        (0x28, 0x61): "EFM8UB20F64G_QFP32",
+        (0x28, 0x60): "EFM8UB20F64G_QFP48",
+        (0x36, 0x00): "EFM8UB30F40G_QFN20",
+        (0x36, 0x01): "EFM8UB31F40G_QFN24",
+        (0x36, 0x02): "EFM8UB31F40G_QSOP24",
     }
     if (a,b) in datasheet_hits.keys():
         return "{} [{:2X}:{:2X}].".format(datasheet_hits[a,b], a, b)
